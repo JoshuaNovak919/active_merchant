@@ -2,12 +2,9 @@ require 'test_helper'
 
 class PayflowTest < Test::Unit::TestCase
   def setup
-    Base.mode = :test
+    ActiveMerchant::Billing::Base.gateway_mode = :test
     
-    @gateway = PayflowGateway.new(
-      :login => 'LOGIN',
-      :password => 'PASSWORD'
-    )
+    @gateway = PayflowGateway.new(fixtures(:payflow))
     
     @amount = 100
     @credit_card = credit_card('4242424242424242')
@@ -32,7 +29,7 @@ class PayflowTest < Test::Unit::TestCase
     assert_failure response
     assert response.test?
   end
-
+  
   def test_credit
     @gateway.expects(:ssl_post).with(anything, regexp_matches(/<CardNum>#{@credit_card.number}<\//), anything).returns("")
     @gateway.expects(:parse).returns({})
@@ -213,7 +210,7 @@ class PayflowTest < Test::Unit::TestCase
     assert_equal "R7960E739F80", response.authorization
   end
   
-  def test_falied_recurring_modify_action_with_starting_at_in_the_past
+  def test_failed_recurring_modify_action_with_starting_at_in_the_past
     @gateway.stubs(:ssl_post).returns(start_date_error_recurring_response)
     
     response = @gateway.recurring(@amount, nil, :profile_id => "RT0000000009", :starting_at => Date.yesterday, :periodicity => :monthly)
@@ -226,7 +223,7 @@ class PayflowTest < Test::Unit::TestCase
     assert_equal "R7960E739F80", response.authorization
   end
   
-  def test_falied_recurring_modify_action_with_starting_at_missing_and_changed_periodicity
+  def test_failed_recurring_modify_action_with_starting_at_missing_and_changed_periodicity
     @gateway.stubs(:ssl_post).returns(start_date_missing_recurring_response)
     
     response = @gateway.recurring(@amount, nil, :profile_id => "RT0000000009", :periodicity => :yearly)

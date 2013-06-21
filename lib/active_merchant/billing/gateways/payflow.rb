@@ -13,14 +13,14 @@ module ActiveMerchant #:nodoc:
       self.homepage_url = 'https://www.paypal.com/cgi-bin/webscr?cmd=_payflow-pro-overview-outside'
       self.display_name = 'PayPal Payflow Pro'
 
-      def authorize(money, credit_card_or_reference, options = {})
-        request = build_sale_or_authorization_request(:authorization, money, credit_card_or_reference, options)
+      def authorize(money, credit_card_or_check_or_reference, options = {})
+        request = build_sale_or_authorization_request(:authorization, money, credit_card_or_check_or_reference, options)
 
         commit(request, options)
       end
 
-      def purchase(money, credit_card_or_reference, options = {})
-        request = build_sale_or_authorization_request(:purchase, money, credit_card_or_reference, options)
+      def purchase(money, credit_card_or_check_or_reference, options = {})
+        request = build_sale_or_authorization_request(:purchase, money, credit_card_or_check_or_reference, options)
 
         commit(request, options)
       end
@@ -32,7 +32,7 @@ module ActiveMerchant #:nodoc:
           refund(money, identification_or_credit_card, options)
         else
           # Perform non-referenced credit
-          request = build_credit_card_request(:credit, money, identification_or_credit_card, options)
+          request = build_credit_card_or_check_request(:credit, money, identification_or_credit_card, options)
           commit(request, options)
         end
       end
@@ -53,10 +53,15 @@ module ActiveMerchant #:nodoc:
       # :bimonthly, :monthly, :biweekly, :weekly, :yearly, :daily, :semimonthly, :quadweekly, :quarterly, :semiyearly
       # * <tt>payments</tt> - The term, or number of payments that will be made
       # * <tt>comment</tt> - A comment associated with the profile
-      def recurring(money, credit_card, options = {})
-        options[:name] = credit_card.name if options[:name].blank? && credit_card
+      def recurring(money, credit_card_or_check, options = {})
+        options[:name] = credit_card_or_check.name if options[:name].blank? && credit_card_or_check
         request = build_recurring_request(options[:profile_id] ? :modify : :add, money, options) do |xml|
-          add_credit_card(xml, credit_card) if credit_card
+          # add_credit_card(xml, credit_card, options) if credit_card
+          if credit_card_or_check.is_a?(CreditCard)
+            add_credit_card(xml, credit_card_or_check, options)
+          elsif credit_card_or_check.is_a?(Check)
+            add_check(xml, credit_card_or_check, options)
+          end
         end
         commit(request, options.merge(:request_type => :recurring))
       end
@@ -76,11 +81,12 @@ module ActiveMerchant #:nodoc:
       end
 
       private
-      def build_sale_or_authorization_request(action, money, credit_card_or_reference, options)
-        if credit_card_or_reference.is_a?(String)
-          build_reference_sale_or_authorization_request(action, money, credit_card_or_reference, options)
+
+      def build_sale_or_authorization_request(action, money, credit_card_or_check_or_reference, options)
+        if credit_card_or_check_or_reference.is_a?(String)
+          build_reference_sale_or_authorization_request(action, money, credit_card_or_check_or_reference, options)
         else
-          build_credit_card_request(action, money, credit_card_or_reference, options)
+          build_credit_card_or_check_request(action, money, credit_card_or_check_or_reference, options)
         end
       end
 
@@ -115,8 +121,12 @@ module ActiveMerchant #:nodoc:
         end
         xml.target!
       end
-
-      def build_credit_card_request(action, money, credit_card, options)
+      
+      def build_credit_card_or_check_request(action, money, credit_card_or_check, options)
+        unless credit_card_or_check.is_a?(CreditCard) || credit_card_or_check.is_a?(Check)
+          raise '`credit_card_or_check` must be a ActiveMerchant::CreditCard or ActiveMerchant::Check instance'
+        end
+        
         xml = Builder::XmlMarkup.new
         xml.tag! TRANSACTIONS[action] do
           xml.tag! 'PayData' do
@@ -140,14 +150,27 @@ module ActiveMerchant #:nodoc:
             end
 
             xml.tag! 'Tender' do
-              add_credit_card(xml, credit_card)
+              if credit_card_or_check.is_a?(CreditCard)
+                add_credit_card(xml, credit_card_or_check, options)
+              elsif credit_card_or_check.is_a?(Check)
+                add_check(xml, credit_card_or_check, options)
+              end
             end
           end
         end
         xml.target!
       end
-
-      def add_credit_card(xml, credit_card)
+      
+      def add_check(xml, check, options)
+        xml.tag! 'ACH' do
+          xml.tag! 'AcctType', check.account_type[0].upcase
+          xml.tag! 'AcctNum', check.account_number
+          xml.tag! 'AuthType', options[:auth_type] || 'WEB'
+          xml.tag! 'ABA', check.routing_number
+        end
+      end
+      
+      def add_credit_card(xml, credit_card, options)
         xml.tag! 'Card' do
           xml.tag! 'CardType', credit_card_type(credit_card)
           xml.tag! 'CardNum', credit_card.number
@@ -169,16 +192,16 @@ module ActiveMerchant #:nodoc:
         CARD_MAPPING[card_brand(credit_card).to_sym]
       end
 
-      def expdate(creditcard)
-        year  = sprintf("%.4i", creditcard.year.to_s.sub(/^0+/, ''))
-        month = sprintf("%.2i", creditcard.month.to_s.sub(/^0+/, ''))
+      def expdate(credit_card)
+        year  = sprintf("%.4i", credit_card.year.to_s.sub(/^0+/, ''))
+        month = sprintf("%.2i", credit_card.month.to_s.sub(/^0+/, ''))
 
         "#{year}#{month}"
       end
 
-      def startdate(creditcard)
-        year  = format(creditcard.start_year, :two_digits)
-        month = format(creditcard.start_month, :two_digits)
+      def startdate(credit_card)
+        year  = format(credit_card.start_year, :two_digits)
+        month = format(credit_card.start_month, :two_digits)
 
         "#{month}#{year}"
       end

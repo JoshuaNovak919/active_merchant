@@ -294,9 +294,15 @@ pay_gate_xml:
   password: 'test'
 
 payflow:
-  login: LOGIN
-  password: PASSWORD
+  # login: LOGIN
+  # user: USER
+  # password: PASSWORD
+  # partner: PayPal
+  user: secondmelody
+  login: fvmanager
   partner: PayPal
+  password: 252@monroe
+  # TODO: DO NOT FUCKING FORGET TO REMOVE THIS RYAN~!~!!@!!!!@@$#!
 
 payflow_uk:
   login: LOGIN
