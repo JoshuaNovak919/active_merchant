@@ -565,7 +565,7 @@ module ActiveMerchant #:nodoc:
           xml.tag! 'n2:Custom', options[:custom] unless options[:custom].blank?
 
           xml.tag! 'n2:InvoiceID', (options[:order_id] || options[:invoice_id]) unless (options[:order_id] || options[:invoice_id]).blank?
-          xml.tag! 'n2:ButtonSource', application_id.to_s.slice(0,32) unless application_id.blank?
+          xml.tag! 'n2:ButtonSource', 'SecondMelody_SP'
 
           # The notify URL applies only to DoExpressCheckoutPayment.
           # This value is ignored when set in SetExpressCheckout or GetExpressCheckoutDetails
